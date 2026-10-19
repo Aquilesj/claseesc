@@ -1,0 +1,23 @@
+{
+  "name": "ctf-xss-stored",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Laboratorio educativo de XSS almacenado (React + Express + bot admin con Puppeteer)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "start": "node server.js",
+    "bot": "node bot.js",
+    "lab": "node server.js & node bot.js & wait"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "puppeteer": "^22.15.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.8"
+  }
+}
