@@ -35,7 +35,7 @@ hace su propia explotación y obtiene una flag distinta e impredecible.
 El paso a paso con Docker + túnel Cloudflare está en **[`docker cloud.md`](./docker%20cloud.md)**.
 Resumen:
 ```bash
-docker compose up -d --build                    # intranet en el puerto 80 (node en :3000 dentro)
+docker compose up -d --build                    # intranet en el puerto 80 (dentro y fuera)
 cloudflared tunnel --url http://localhost:80    # URL pública temporal para la clase
 ```
 Abre el puerto 80 (o la URL del túnel) → verás el **login** de la intranet.
@@ -53,7 +53,7 @@ Abre el puerto 80 (o la URL del túnel) → verás el **login** de la intranet.
 ## Estructura
 ```
 Dockerfile            Imagen node:20; compila getflag (0711); corre como 'node'
-docker-compose.yml    Publica 80 -> 3000
+docker-compose.yml    Publica 80 -> 80
 getflag.c             Generador de la flag por sala (secreto no legible)
 package.json          Dependencia: express
 server.js             Login + intranet + visor vulnerable (LFI+SSTI) + log por sala
