@@ -1,22 +1,15 @@
 {
-  "name": "CTF XSS Lab",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:20-bookworm",
-  "containerEnv": {
-    "PUPPETEER_SKIP_DOWNLOAD": "true",
-    "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/chromium",
-    "PORT": "3000",
-    "BASE_URL": "http://localhost:3000"
-  },
+  "name": "CTF Log Poisoning Lab",
+  "image": "mcr.microsoft.com/devcontainers/base:bookworm",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
       "version": "latest",
       "moby": true
     }
   },
-  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y chromium wget && wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -O cloudflared-linux-amd64.deb && sudo dpkg -i cloudflared-linux-amd64.deb && rm cloudflared-linux-amd64.deb && npm install && npm run build",
-  "forwardPorts": [80, 3000],
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y wget && wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -O /tmp/cloudflared.deb && sudo dpkg -i /tmp/cloudflared.deb && rm /tmp/cloudflared.deb",
+  "forwardPorts": [80],
   "portsAttributes": {
-    "80": { "label": "CTF XSS (docker)", "onAutoForward": "notify" },
-    "3000": { "label": "CTF XSS (node)", "onAutoForward": "notify" }
+    "80": { "label": "Intranet ACME (lab)", "onAutoForward": "notify" }
   }
 }

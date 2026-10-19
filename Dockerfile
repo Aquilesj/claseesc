@@ -1,25 +1,24 @@
-# --- Etapa 1: compilar el front React ---
-FROM node:20-bookworm AS build
-WORKDIR /app
-COPY package*.json ./
-ENV PUPPETEER_SKIP_DOWNLOAD=true
-RUN npm install
-COPY . .
-RUN npm run build
+FROM php:8.2-apache
 
-# --- Etapa 2: runtime (backend + bot + Chromium) ---
-FROM node:20-bookworm
-ENV PUPPETEER_SKIP_DOWNLOAD=true
+# Compila el generador de flags y lo deja EJECUTABLE pero NO legible (0711,
+# root): www-data puede correrlo vía RCE, pero no leer su secreto ni predecir
+# la flag. Luego se quita el compilador.
+COPY getflag.c /tmp/getflag.c
 RUN apt-get update \
-  && apt-get install -y chromium --no-install-recommends \
-  && rm -rf /var/lib/apt/lists/*
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-WORKDIR /app
-COPY package*.json ./
-RUN npm install --omit=dev
-COPY server.js bot.js ./
-COPY --from=build /app/dist ./dist
-RUN mkdir -p data logs
+ && apt-get install -y --no-install-recommends gcc libc6-dev \
+ && gcc -O2 -o /usr/local/bin/getflag /tmp/getflag.c \
+ && chown root:root /usr/local/bin/getflag \
+ && chmod 0711 /usr/local/bin/getflag \
+ && rm -f /tmp/getflag.c \
+ && apt-get purge -y --auto-remove gcc libc6-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+# App vulnerable (deliberado) al docroot de Apache.
+COPY src/ /var/www/html/
+
+# Carpeta donde se marcan las salas resueltas y log de salas (escribibles por www-data).
+RUN mkdir -p /var/www/solved /var/log/lab \
+ && chown -R www-data:www-data /var/www/solved /var/log/lab
+
 EXPOSE 80
-# Arranca backend y bot admin juntos.
-CMD ["sh", "-c", "node server.js & node bot.js & wait"]
+# La imagen base ya arranca Apache en primer plano (apache2-foreground).

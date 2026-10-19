@@ -1,11 +1,7 @@
 services:
   web:
     build: .
-    image: ctf-xss
+    image: ctf-logpoison
     ports:
       - "80:80"
-    environment:
-      # El bot visita el sitio por esta URL. En una sola instancia, localhost basta.
-      # En AWS, cámbiala a http://IP_PUBLICA si quieres que el bot entre por la IP pública.
-      - BASE_URL=http://localhost
     restart: unless-stopped
