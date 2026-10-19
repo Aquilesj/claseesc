@@ -65,7 +65,8 @@ app.get('/loot', (req, res) => {
 // Front React compilado.
 const dist = path.join(__dirname, 'dist');
 app.use(express.static(dist));
-// La SPA se sirve en / y en /board (lee ?room= en el cliente).
-app.get(['/', '/board'], (req, res) => res.sendFile(path.join(dist, 'index.html')));
+// La SPA se sirve en /, /login y /board. Sin ?room= se muestra el login;
+// con ?room= (o en /board) se muestra el muro de esa sala.
+app.get(['/', '/login', '/board'], (req, res) => res.sendFile(path.join(dist, 'index.html')));
 
 app.listen(PORT, () => console.log(`CTF XSS escuchando en :${PORT}`));

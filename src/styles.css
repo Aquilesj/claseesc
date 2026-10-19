@@ -104,3 +104,164 @@ h2 {
 }
 
 .vacio { color: var(--suave); font-style: italic; }
+
+/* --- Login --- */
+.login { max-width: 460px; }
+
+.login-card {
+  background: #fff;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 28px 24px;
+  margin-top: 8px;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+}
+
+.login-card h1 { margin-top: 0; }
+
+.caja-login {
+  width: 100%;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 16px;
+  font-family: inherit;
+  background: #fff;
+  margin-bottom: 12px;
+}
+
+.caja-login:focus {
+  outline: none;
+  border-color: var(--azul);
+  box-shadow: 0 0 0 3px rgba(29, 111, 224, 0.15);
+}
+
+.login-card .btn-azul { width: 100%; margin-top: 0; }
+
+.preview { color: var(--suave); font-size: 14px; margin: 14px 0 0; }
+.preview code {
+  background: #eef1f5;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* --- Barra superior del muro --- */
+.topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.topbar h1 { margin: 8px 0 4px; }
+
+.btn-salir {
+  background: #fff;
+  color: var(--texto);
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-salir:hover { background: #f4f6f9; }
+
+/* --- Acciones del formulario --- */
+.acciones {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.btn-sec {
+  background: #eef1f5;
+  color: var(--texto);
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  padding: 11px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-sec:hover { background: #e4e9f0; }
+
+/* --- Guía paso a paso dinámica --- */
+.pasos {
+  background: #fff;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 16px 20px 8px;
+  margin: 8px 0 24px;
+}
+
+.pasos h2 {
+  border: none;
+  margin: 4px 0 8px;
+  padding: 0;
+  font-size: 16px;
+}
+
+.pasos ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.paso {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid #eef1f5;
+}
+
+.paso:first-child { border-top: none; }
+
+.paso-num {
+  flex: 0 0 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #eef1f5;
+  color: var(--suave);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.paso.activo .paso-num {
+  background: rgba(29, 111, 224, 0.15);
+  color: var(--azul);
+}
+
+.paso.done .paso-num {
+  background: #1f9d55;
+  color: #fff;
+}
+
+.paso-titulo { font-weight: 600; font-size: 15px; }
+.paso.done .paso-titulo { color: var(--suave); }
+.paso-detalle { color: var(--suave); font-size: 13px; margin-top: 2px; }
+
+.esperando { color: var(--azul); font-weight: 600; font-size: 13px; }
+
+.flag-box {
+  margin-top: 8px;
+  background: #e7f6ec;
+  border: 1px solid #b7e2c5;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 15px;
+}
+
+.flag-box code {
+  background: transparent;
+  color: #0f7a3d;
+  font-weight: 700;
+}
