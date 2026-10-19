@@ -1,0 +1,15 @@
+<h1>Bienvenido a la Intranet ACME</h1>
+<p>Portal interno. Usa el menú de arriba para navegar entre las secciones.</p>
+
+<p>Las páginas se cargan con el visor interno (<code>?page=pages/…</code>), que además
+soporta expresiones dinámicas de plantilla.</p>
+
+<p>Fecha del servidor: ${ new Date().toISOString() }</p>
+
+<hr>
+<strong>Nota del equipo de desarrollo (pendiente de revisión):</strong>
+<ul>
+  <li>El visor lee el archivo de <code>?page=</code> directamente. Revisar validación de rutas.</li>
+  <li>El visor evalúa expresiones <code>${'$'}{ ... }</code> en las plantillas (motor propio).</li>
+  <li>Cada visita se registra con su User-Agent en <code>/var/log/lab/&lt;sala&gt;.log</code>.</li>
+</ul>

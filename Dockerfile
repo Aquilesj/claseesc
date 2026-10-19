@@ -1,8 +1,8 @@
-FROM php:8.2-apache
+FROM node:20-bookworm
 
-# Compila el generador de flags y lo deja EJECUTABLE pero NO legible (0711,
-# root): www-data puede correrlo vía RCE, pero no leer su secreto ni predecir
-# la flag. Luego se quita el compilador.
+# Compila el generador de flags: EJECUTABLE pero NO legible (0711, root).
+# El proceso corre como usuario 'node', que puede ejecutarlo vía RCE pero no
+# leer su secreto ni predecir la flag -> obliga a conseguir ejecución de código.
 COPY getflag.c /tmp/getflag.c
 RUN apt-get update \
  && apt-get install -y --no-install-recommends gcc libc6-dev \
@@ -13,12 +13,20 @@ RUN apt-get update \
  && apt-get purge -y --auto-remove gcc libc6-dev \
  && rm -rf /var/lib/apt/lists/*
 
-# App vulnerable (deliberado) al docroot de Apache.
-COPY src/ /var/www/html/
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --omit=dev
+COPY server.js ./
+COPY public ./public
+COPY pages ./pages
 
-# Carpeta donde se marcan las salas resueltas y log de salas (escribibles por www-data).
-RUN mkdir -p /var/www/solved /var/log/lab \
- && chown -R www-data:www-data /var/www/solved /var/log/lab
+# Directorios escribibles por el usuario 'node' (log de salas + resueltos).
+RUN mkdir -p /var/log/lab /var/www/solved \
+ && chown -R node:node /var/log/lab /var/www/solved
 
-EXPOSE 80
-# La imagen base ya arranca Apache en primer plano (apache2-foreground).
+# El usuario 'node' no puede bindear el puerto 80 (privilegiado); escuchamos
+# en 3000 y el compose publica 80->3000.
+ENV PORT=3000
+USER node
+EXPOSE 3000
+CMD ["node", "server.js"]

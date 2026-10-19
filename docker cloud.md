@@ -1,6 +1,6 @@
 # Docker + túnel Cloudflare en Codespaces
 
-Paso a paso para levantar el lab de **Log Poisoning** (PHP + Apache) y exponerlo a Internet
+Paso a paso para levantar el lab de **Log Poisoning** (Node/Express) y exponerlo a Internet
 con un túnel Cloudflare gratuito (sin AWS). Útil si creaste el Codespace sin el
 `.devcontainer` (que ya instala cloudflared).
 
@@ -14,7 +14,7 @@ curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/
 echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
 sudo apt-get update && sudo apt-get install -y cloudflared
 
-# 3. Levantar la intranet vulnerable (PHP + Apache) en el puerto 80
+# 3. Levantar la intranet vulnerable (Node/Express) en el puerto 80
 docker compose up -d --build
 
 # 4. Lanzar el túnel público gratuito al puerto 80
