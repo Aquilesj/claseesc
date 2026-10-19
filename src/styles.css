@@ -191,40 +191,47 @@ h2 {
 
 .btn-sec:hover { background: #e4e9f0; }
 
-/* --- Guía paso a paso dinámica --- */
-.pasos {
+/* --- Reto guiado por etapas --- */
+.reto {
   background: #fff;
   border: 1px solid var(--borde);
   border-radius: 12px;
-  padding: 16px 20px 8px;
+  padding: 16px 20px;
   margin: 8px 0 24px;
 }
 
-.pasos h2 {
-  border: none;
-  margin: 4px 0 8px;
-  padding: 0;
-  font-size: 16px;
+.reto-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.pasos ol {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.reto-head h2 { border: none; margin: 4px 0 8px; padding: 0; font-size: 16px; }
+
+.progreso {
+  font-size: 13px;
+  color: var(--suave);
+  background: #eef1f5;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-weight: 600;
 }
 
-.paso {
+.etapas { list-style: none; margin: 8px 0 0; padding: 0; }
+
+.etapa {
   display: flex;
   gap: 12px;
-  padding: 12px 0;
+  padding: 14px 0;
   border-top: 1px solid #eef1f5;
 }
 
-.paso:first-child { border-top: none; }
+.etapa:first-child { border-top: none; }
+.etapa.bloqueada { opacity: 0.55; }
 
-.paso-num {
-  flex: 0 0 26px;
-  height: 26px;
+.etapa-num {
+  flex: 0 0 28px;
+  height: 28px;
   border-radius: 50%;
   background: #eef1f5;
   color: var(--suave);
@@ -235,33 +242,69 @@ h2 {
   font-weight: 700;
 }
 
-.paso.activo .paso-num {
+.etapa.activa .etapa-num {
   background: rgba(29, 111, 224, 0.15);
   color: var(--azul);
 }
 
-.paso.done .paso-num {
-  background: #1f9d55;
-  color: #fff;
+.etapa.done .etapa-num { background: #1f9d55; color: #fff; }
+
+.etapa-cuerpo { flex: 1; }
+.etapa-titulo { font-weight: 600; font-size: 15px; }
+.etapa.done .etapa-titulo { color: var(--suave); }
+.etapa-objetivo { color: var(--suave); font-size: 13px; margin-top: 4px; line-height: 1.45; }
+
+.etapa-acciones { margin-top: 10px; }
+
+.btn-pista {
+  background: #fff;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--azul);
+  cursor: pointer;
 }
 
-.paso-titulo { font-weight: 600; font-size: 15px; }
-.paso.done .paso-titulo { color: var(--suave); }
-.paso-detalle { color: var(--suave); font-size: 13px; margin-top: 2px; }
+.btn-pista:hover { background: #f4f6f9; }
 
-.esperando { color: var(--azul); font-weight: 600; font-size: 13px; }
+.pista {
+  margin-top: 10px;
+  background: #f7f9fc;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
 
-.flag-box {
-  margin-top: 8px;
+.pista p { margin: 0 0 8px; font-size: 13px; color: var(--texto); }
+
+.pista-codigo {
+  display: block;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  overflow-x: auto;
+  white-space: pre;
+  margin-bottom: 8px;
+}
+
+.esperando {
+  color: var(--azul);
+  font-weight: 600;
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+.exito {
   background: #e7f6ec;
   border: 1px solid #b7e2c5;
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 10px 14px;
   font-size: 15px;
+  margin: 4px 0 12px;
 }
 
-.flag-box code {
-  background: transparent;
-  color: #0f7a3d;
-  font-weight: 700;
-}
+.exito code { background: transparent; color: #0f7a3d; font-weight: 700; }

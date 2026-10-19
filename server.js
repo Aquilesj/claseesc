@@ -24,23 +24,37 @@ app.use((req, res, next) => {
   next();
 });
 
-const roomFile = (r) => path.join(DATA, `${(r || '').replace(/[^a-z0-9_-]/gi, '')}.json`);
+const clean = (r) => (r || '').replace(/[^a-z0-9_-]/gi, '');
+const roomFile = (r) => path.join(DATA, `${clean(r)}.json`);
+const readComments = (r) => {
+  const f = roomFile(r);
+  return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f)) : [];
+};
+const readLines = (f) =>
+  fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').filter(Boolean) : [];
 
 // Publicar comentario (SIN sanitizar: es la vulnerabilidad deliberada del lab).
 app.post('/api/comments', (req, res) => {
   const { room, text } = req.body || {};
   if (!room || !text) return res.status(400).json({ error: 'room y text requeridos' });
-  const f = roomFile(room);
-  const list = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f)) : [];
+  const list = readComments(room);
   list.push({ text, ts: Date.now() });
-  fs.writeFileSync(f, JSON.stringify(list));
+  fs.writeFileSync(roomFile(room), JSON.stringify(list));
   res.json({ ok: true });
 });
 
 // Listar comentarios de una sala.
 app.get('/api/comments', (req, res) => {
-  const f = roomFile(req.query.room);
-  res.json(fs.existsSync(f) ? JSON.parse(fs.readFileSync(f)) : []);
+  res.json(readComments(req.query.room));
+});
+
+// Beacon: demuestra EJECUCIÓN de JS sin robar nada (etapa 4 de la guía).
+app.get('/beacon', (req, res) => {
+  fs.appendFileSync(
+    path.join(LOGS, 'beacon.log'),
+    `${new Date().toISOString()} ${JSON.stringify(req.query)}\n`
+  );
+  res.type('gif').send(Buffer.from('R0lGODlhAQABAAAAACw=', 'base64'));
 });
 
 // Buzón de exfiltración del lab: registra la query completa y responde un pixel 1x1.
@@ -54,19 +68,44 @@ app.get('/collect', (req, res) => {
 
 // Botín por sala: muestra en texto lo que llegó a /collect para esa sala.
 app.get('/loot', (req, res) => {
-  const room = (req.query.room || '').replace(/[^a-z0-9_-]/gi, '');
-  const log = path.join(LOGS, 'collect.log');
-  const lines = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').split('\n') : [];
+  const room = clean(req.query.room);
+  const lines = readLines(path.join(LOGS, 'collect.log'));
   res
     .type('text/plain')
     .send(lines.filter((l) => l.includes(`"room":"${room}"`)).join('\n') || 'aun no hay botin');
 });
 
-// Front React compilado.
-const dist = path.join(__dirname, 'dist');
-app.use(express.static(dist));
-// La SPA se sirve en /, /login y /board. Sin ?room= se muestra el login;
-// con ?room= (o en /board) se muestra el muro de esa sala.
-app.get(['/', '/login', '/board'], (req, res) => res.sendFile(path.join(dist, 'index.html')));
+// Estado del progreso de la guía interactiva (lo consume la UI por polling).
+app.get('/status', (req, res) => {
+  const room = clean(req.query.room);
+  const texts = readComments(room).map((c) => c.text || '');
+  const inRoom = (l) => l.includes(`"room":"${room}"`);
+  const beacon = readLines(path.join(LOGS, 'beacon.log')).filter(inRoom);
+  const collect = readLines(path.join(LOGS, 'collect.log')).filter(inRoom);
+  const cookieHits = collect.filter((l) => /"c":"[^"]+"/.test(l));
+  const flagMatch = collect.map((l) => l.match(/FLAG\{[^}]*\}/)).find(Boolean);
+
+  res.json({
+    hasComments: texts.length > 0,
+    htmlInjected: texts.some((t) => /<\/?[a-z][^>]*>/i.test(t)),
+    scriptTried: texts.some((t) => /<script/i.test(t)),
+    eventHandlerUsed: texts.some((t) => /on[a-z]+\s*=/i.test(t)),
+    jsExecuted: beacon.length > 0 || collect.length > 0,
+    cookieCaptured: cookieHits.length > 0,
+    flagCaptured: !!flagMatch,
+    flag: flagMatch ? flagMatch[0] : ''
+  });
+});
+
+// Front React. Al servir la página dejamos una cookie de invitado (NO HttpOnly)
+// para que en la etapa 5 el alumno capture "una" cookie... pero sin la flag.
+function servePage(req, res) {
+  res.cookie('session', 'invitado', { httpOnly: false, sameSite: 'lax' });
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+}
+
+// Las rutas de página van ANTES del static para poder fijar la cookie.
+app.get(['/', '/login', '/board'], servePage);
+app.use(express.static(path.join(__dirname, 'dist'), { index: false }));
 
 app.listen(PORT, () => console.log(`CTF XSS escuchando en :${PORT}`));
