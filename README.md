@@ -42,13 +42,31 @@ Abre el puerto 80 (o la URL del túnel) → verás el **login** de la intranet.
 
 > **GitHub Pages no sirve**: este lab necesita un servidor Node en ejecución, no estáticos.
 
+## Interfaz
+La ventana principal **parece una intranet corporativa real** (ACME S.A.): login de
+empleados, menú (Inicio, Comunicados, Directorio, Soporte TI, Acerca de) y contenido servido
+por el propio visor vulnerable (`?page=`). El reto **no se muestra de entrada**: hay un botón
+flotante **🎯 Misión CTF** que abre un panel lateral con la guía de 6 etapas, explicaciones
+(qué haces / qué observar / por qué / en la vida real) y **pistas progresivas** (primero un
+empujón conceptual, al final el comando exacto) para que el alumno **navegue e investigue** en
+vez de recibir todo servido. La pista del log, por ejemplo, está escondida en **Soporte TI**.
+
 ## Rutas
 | Ruta | Qué hace |
 |------|----------|
 | `GET /` | Login; con `?room=` entra a la intranet. |
-| `GET /?room=NAME&page=FILE&cmd=CMD` | Visor que **lee y renderiza** `FILE` (LFI + SSTI). |
+| `GET /?room=NAME&page=FILE` | Visor que **lee y renderiza** `FILE` (LFI + SSTI). |
+| `GET /?room=NAME&page=FILE&raw=1` | Lectura **cruda** (sin evaluar): inspección/enumeración. |
+| `GET /?room=NAME&page=LOG&cmd=CMD` | Renderiza el log envenenado y ejecuta `CMD` (RCE). |
 | `GET /status?room=NAME` | Progreso del reto en JSON (lo usa la guía). |
 | `GET /check?room=NAME&flag=...` | Valida la flag de la sala. |
+
+## Equipo azul (puente al repo SIEM)
+Toda petición queda en `/var/log/lab/access.log` (formato combinado, con 404), y las visitas
+por sala en `/var/log/lab/<sala>.log`. Para cazar la cadena:
+```bash
+docker compose exec web grep -Ei "\.\./|/etc/passwd|\$\{|require\(|child_process|execSync" /var/log/lab/*.log
+```
 
 ## Estructura
 ```
@@ -56,10 +74,11 @@ Dockerfile            Imagen node:20; compila getflag (0711); corre como 'node'
 docker-compose.yml    Publica 80 -> 80
 getflag.c             Generador de la flag por sala (secreto no legible)
 package.json          Dependencia: express
-server.js             Login + intranet + visor vulnerable (LFI+SSTI) + log por sala
-public/guide.js       Guía dinámica de 6 etapas (polling a /status)
-public/style.css      Estilos
-pages/                Plantillas benignas de la intranet (home, about)
+server.js             Login + intranet + visor vulnerable (LFI+SSTI+raw) + logs
+.env                  Archivo señuelo (el secreto real NO está aquí)
+public/guide.js       Panel "Misión CTF": 6 etapas, explicaciones, pistas progresivas
+public/style.css      Estilos de la intranet + panel lateral
+pages/                Secciones del sitio (inicio, comunicados, directorio, soporte, acerca)
 .devcontainer/        Codespaces: Docker-in-Docker + cloudflared
 ```
 

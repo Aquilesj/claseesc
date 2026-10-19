@@ -1,6 +1,6 @@
 // =====================================================================
-//  Intranet vulnerable (Node/Express) — Lab de LOG POISONING -> RCE
-//  TODO aquí es DELIBERADAMENTE inseguro, con fines docentes.
+//  Intranet ACME (Node/Express) — Lab de LOG POISONING -> RCE
+//  Portal corporativo DELIBERADAMENTE vulnerable, con fines docentes.
 //  Entorno autorizado y desechable del curso.
 // =====================================================================
 const express = require('express');
@@ -20,8 +20,22 @@ const clean = (r) => (r || '').replace(/[^a-z0-9_-]/gi, '');
 const esc = (s) =>
   String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-// Registra cada visita por sala. Guarda el User-Agent TAL CUAL (sin sanitizar):
-// esa es, a propósito, la vía de "envenenamiento" del log.
+// --- Log de accesos combinado (TODA petición, incluidos 404). Material para
+//     el equipo azul: ráfagas de 404, rutas con ../, User-Agent raro, cmd=. ---
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    const ua = (req.headers['user-agent'] || '-').replace(/[\r\n]/g, ' ');
+    const line = `${req.ip} - - [${new Date().toISOString()}] "${req.method} ${req.originalUrl}" ${res.statusCode} "${ua}"\n`;
+    try {
+      fs.appendFileSync(path.join(LOGDIR, 'access.log'), line);
+    } catch (e) {
+      /* ignore */
+    }
+  });
+  next();
+});
+
+// --- Log por sala: guarda el User-Agent TAL CUAL (vía de "envenenamiento"). ---
 function logVisit(req, room) {
   if (!room) return;
   const ua = req.headers['user-agent'] || '-';
@@ -33,9 +47,8 @@ function logVisit(req, room) {
   }
 }
 
-// Motor de plantillas casero DELIBERADAMENTE inseguro: evalúa cada ${...}
-// como JavaScript del lado del servidor (SSTI). Es lo que convierte el log
-// envenenado en ejecución de código.
+// --- Motor de plantillas casero DELIBERADAMENTE inseguro: evalúa cada ${...}
+//     como JavaScript del lado del servidor (SSTI). ---
 function render(content, cmd) {
   return content.replace(/\$\{([^}]*)\}/g, (m, expr) => {
     try {
@@ -48,79 +61,109 @@ function render(content, cmd) {
   });
 }
 
-function shell(room, inner) {
-  return `<!doctype html>
-<html lang="es"><head>
+// ---------- plantillas de la UI (se ven como una web real) ----------
+const NAV = [
+  ['Inicio', 'pages/inicio.tmpl'],
+  ['Comunicados', 'pages/comunicados.tmpl'],
+  ['Directorio', 'pages/directorio.tmpl'],
+  ['Soporte TI', 'pages/soporte.tmpl'],
+  ['Acerca de', 'pages/acerca.tmpl']
+];
+
+function shell(inner, extraHead = '') {
+  return `<!doctype html><html lang="es"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Intranet ACME — Lab Log Poisoning</title>
-<link rel="stylesheet" href="/style.css"></head><body>
-<div class="lab-banner">⚠️ Laboratorio educativo de seguridad web (Log Poisoning → RCE).
-Entorno autorizado y desechable del curso. No uses estas técnicas fuera de este laboratorio.</div>
-${inner}
-</body></html>`;
+<title>ACME S.A. — Intranet corporativa</title>
+<link rel="stylesheet" href="/style.css">${extraHead}</head><body>${inner}</body></html>`;
 }
 
 function loginHtml() {
-  return shell('', `
-  <div class="wrap login"><div class="card">
-    <h1>Intranet ACME</h1>
-    <p class="muted">Escribe tu nombre para entrar a tu sala del laboratorio.</p>
-    <form method="get" action="/">
-      <input class="inp" name="room" placeholder="Tu nombre" autofocus required>
-      <button class="btn" type="submit">Entrar</button>
-    </form>
-    <p class="muted small">Tu sala se deriva de tu nombre (ej. <code>Ana Pérez → anaperez</code>).</p>
-  </div></div>`);
+  return shell(`
+  <div class="auth">
+    <div class="auth-card">
+      <div class="logo">▰ ACME <span>S.A.</span></div>
+      <h1>Portal de empleados</h1>
+      <p class="muted">Acceso restringido a personal autorizado. Ingresa tu usuario corporativo.</p>
+      <form method="get" action="/">
+        <input class="inp" name="room" placeholder="usuario (ej. tu nombre)" autofocus required>
+        <button class="btn" type="submit">Ingresar</button>
+      </form>
+      <p class="muted small">¿Problemas para acceder? Escribe a soporte@acme.local</p>
+    </div>
+    <div class="auth-foot">© ACME S.A. · Uso interno</div>
+  </div>`);
 }
 
-function intranetHtml(room, out) {
+function intranetHtml(room, bodyHtml, activePage) {
   const r = esc(room);
-  return shell(room, `
-  <div class="topbar">
-    <div class="brand">Intranet ACME — <span class="muted">sala: ${r}</span></div>
-    <a class="btn ghost" href="/">Cerrar sesión</a>
-  </div>
-  <div class="layout">
-    <aside class="guia" id="guia" data-room="${r}" data-logpath="/var/log/lab/${r}.log">
-      <h2>Reto guiado <span class="prog" id="prog">0/6</span></h2>
-      <div class="exito" id="exito" hidden>🎉 ¡Flag válida! Reto completado.</div>
-      <ol class="etapas" id="etapas"></ol>
-      <div class="flagbox">
-        <label for="flagInput">Envía tu flag</label>
-        <input class="inp" id="flagInput" placeholder="FLAG{...}">
-        <button class="btn" id="flagBtn" type="button">Validar</button>
-        <p class="flagmsg" id="flagMsg"></p>
-      </div>
-    </aside>
-    <main class="viewer">
-      <nav class="nav">
-        <a href="/?room=${r}&page=pages/home.tmpl">Inicio</a>
-        <a href="/?room=${r}&page=pages/about.tmpl">Acerca de</a>
-      </nav>
-      <section class="content"><pre class="salida">${esc(out)}</pre></section>
-    </main>
-  </div>
+  const nav = NAV.map(
+    ([label, file]) =>
+      `<a class="${activePage === file ? 'active' : ''}" href="/?room=${r}&page=${file}">${label}</a>`
+  ).join('');
+  return shell(`
+  <header class="site-head">
+    <div class="bar">
+      <div class="logo">▰ ACME <span>S.A.</span></div>
+      <nav class="nav">${nav}</nav>
+      <div class="user">👤 ${r} · <a href="/">salir</a></div>
+    </div>
+  </header>
+  <main class="site-main">${bodyHtml}</main>
+  <footer class="site-foot">
+    <div>ACME S.A. · Intranet corporativa · Mesa de ayuda ext. 4040</div>
+    <div class="muted small">Sistema interno — prohibida su divulgación.</div>
+  </footer>
+
+  <button class="mission-btn" id="missionBtn" title="Guía del reto">🎯<span>Misión CTF</span></button>
+  <aside class="drawer" id="guia" data-room="${r}" data-logpath="/var/log/lab/${r}.log" hidden>
+    <div class="drawer-head">
+      <div><strong>Misión CTF</strong> <span class="prog" id="prog">0/6</span></div>
+      <button class="x" id="closeGuia" title="Cerrar">✕</button>
+    </div>
+    <div class="drawer-intro">
+      Esta es una intranet real y vulnerable. <b>Explórala</b>: navega el menú, mira la URL y
+      descubre cómo funciona. La guía te orienta, pero el trabajo de investigación es tuyo.
+    </div>
+    <div class="exito" id="exito" hidden>🎉 ¡Flag válida! Misión completada.</div>
+    <ol class="etapas" id="etapas"></ol>
+    <div class="flagbox">
+      <label for="flagInput">Enviar flag</label>
+      <input class="inp" id="flagInput" placeholder="pega aquí tu flag">
+      <button class="btn" id="flagBtn" type="button">Validar</button>
+      <p class="flagmsg" id="flagMsg"></p>
+    </div>
+  </aside>
   <script src="/guide.js"></script>`);
 }
 
-// Página principal + visor vulnerable.
+// ---------- sitio + visor vulnerable ----------
 app.get(['/', '/board'], (req, res) => {
   const room = clean(req.query.room);
   logVisit(req, room);
   if (!room) return res.send(loginHtml());
 
-  let out;
+  const p = req.query.page;
+  const raw = req.query.raw === '1';
+  const isSitePage = typeof p === 'string' && p.startsWith('pages/');
+  let bodyHtml;
+
   try {
-    const p = req.query.page;
-    // ===== LECTURA ARBITRARIA DE ARCHIVOS (LFI/path traversal) =====
-    const file = p === undefined ? path.join(__dirname, 'pages', 'home.tmpl') : p;
-    const content = fs.readFileSync(file, 'utf8');
-    // ===== RENDER INSEGURO (SSTI): evalúa ${...} =====
-    out = render(content, req.query.cmd || '');
+    const file = p === undefined ? path.join(__dirname, 'pages', 'inicio.tmpl') : p;
+    const content = fs.readFileSync(file, 'utf8'); // LFI deliberado
+    if (raw) {
+      // Lectura CRUDA: muestra el archivo sin evaluar (para inspeccionar/enumerar).
+      bodyHtml = `<div class="doc"><div class="doc-bar">📄 ${esc(p)} <span class="muted">(lectura cruda)</span></div><pre class="dump">${esc(content)}</pre></div>`;
+    } else if (p === undefined || isSitePage) {
+      // Página propia del sitio: se renderiza como HTML (SSTI en ${...}).
+      bodyHtml = render(content, req.query.cmd || '');
+    } else {
+      // Archivo ajeno renderizado (p. ej. un log): salida en texto.
+      bodyHtml = `<div class="doc"><div class="doc-bar">📄 ${esc(p)} <span class="muted">(render)</span></div><pre class="dump">${esc(render(content, req.query.cmd || ''))}</pre></div>`;
+    }
   } catch (e) {
-    out = '[no se pudo leer el archivo: ' + e.message + ']';
+    bodyHtml = `<div class="doc"><pre class="dump">[no se pudo abrir el documento: ${esc(e.message)}]</pre></div>`;
   }
-  res.send(intranetHtml(room, out));
+  res.send(intranetHtml(room, bodyHtml, isSitePage ? p : ''));
 });
 
 // Progreso del reto (lee el log de la sala; NO lo renderiza).
@@ -134,7 +177,7 @@ app.get('/status', (req, res) => {
   }
   res.json({
     visited: log !== '',
-    lfi: /page=[^ "&]*(passwd|\/etc\/|\.\.|\/var\/)/i.test(log),
+    lfi: /page=[^ "&]*(passwd|\/etc\/|\.\.|\/var\/|\.env|server\.js)/i.test(log),
     logIncluded: /page=[^ "&]*\.log/i.test(log),
     poisoned: log.includes('${'),
     rce: /\.log[^ "]*cmd=/i.test(log),
@@ -142,7 +185,7 @@ app.get('/status', (req, res) => {
   });
 });
 
-// Validación de la flag (se obtiene ejecutando getflag, solo posible vía RCE).
+// Validación de la flag (solo obtenible ejecutando getflag vía RCE).
 app.get('/check', (req, res) => {
   const room = clean(req.query.room);
   const flag = (req.query.flag || '').trim();
@@ -165,4 +208,12 @@ app.get('/check', (req, res) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
+
+// 404 real (genera ráfagas de 404 en el access.log durante el fuzzing).
+app.use((req, res) => {
+  res
+    .status(404)
+    .send(shell('<main class="site-main"><div class="doc"><h1>404</h1><p>Página no encontrada en la intranet ACME.</p></div></main>'));
+});
+
 app.listen(PORT, () => console.log(`Intranet ACME (lab log poisoning) en :${PORT}`));

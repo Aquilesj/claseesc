@@ -1,0 +1,27 @@
+<h1>Soporte TI — Centro de ayuda</h1>
+<p class="muted">Estado de servicios y notas técnicas del equipo de Tecnología.</p>
+
+<div class="estado">
+  <span class="ok">● Portal: operativo</span>
+  <span class="ok">● Correo: operativo</span>
+  <span class="warn">● Backups: en revisión</span>
+</div>
+
+<h3>Preguntas frecuentes</h3>
+<ul>
+  <li><b>¿Cómo cambio mi contraseña?</b> Desde tu perfil corporativo.</li>
+  <li><b>No carga una sección.</b> Revisa el parámetro <code>?page=</code> en la URL.</li>
+</ul>
+
+<div class="itnote">
+  <h3>🔧 Nota interna de TI (no borrar)</h3>
+  <ul>
+    <li>El portal usa un <b>visor de plantillas</b> propio: carga el archivo de <code>?page=</code>
+      y <b>evalúa expresiones</b> del tipo <code>${'$'}{ ... }</code> para los valores dinámicos
+      (fecha, año, etc.).</li>
+    <li>Por política de <b>auditoría</b>, cada visita se registra —con su <i>User-Agent</i>— en
+      <code>/var/log/lab/&lt;tu-sesión&gt;.log</code>.</li>
+    <li>Pendiente: endurecer la validación de rutas del visor y dejar de evaluar plantillas con
+      datos de usuario. (ticket OPS-412)</li>
+  </ul>
+</div>
